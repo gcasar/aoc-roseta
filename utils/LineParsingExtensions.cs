@@ -14,6 +14,15 @@ public static class LineParsingExtensions
         return groups.Values.Skip(1).Select(it => it.Value).ToList();
     }
 
+    public static string ExtractString(this string input, string pattern)
+    {
+        var (result, _) = input.Parse(pattern);
+        return result;
+    }
+
+    public static int? ExtractInt(this string input, string pattern) =>
+        int.TryParse(input.ExtractString(pattern), out int result) ? result : null;
+
     public static void Deconstruct<T>(this IList<T> list, out T first, out IList<T> rest) {
         first = (list.Count > 0 ? list[0] : default(T))!; // or throw
         rest = list.Skip(1).ToList();

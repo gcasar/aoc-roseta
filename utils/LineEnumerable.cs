@@ -28,5 +28,7 @@ public class LineEnumerable : IEnumerable<string>
         return File.ReadLines(path).GetEnumerator();
     }
 
+    public string ReadAll() => string.Join("\n", this);
+
     public override string ToString() => $"Lines from \"{_filename}\"";
 }
