@@ -25,7 +25,7 @@ public class Day11
             foreach (var (monkey, idx) in monkeys.Select((it, idx) => (it, idx)))
             {
                 monkeys[idx].InspectCount += monkey.Items.Count;
-                foreach (var action in monkey.PerformTurn())
+                foreach (var action in monkey.PerformTurn( it => it / 3))
                 {
                     monkeys[action.target].Items.Add(action.level);
                 }
@@ -38,10 +38,35 @@ public class Day11
     }
 
     [Theory]
-    [FileLineTest("2022/day11/example1.in", "ABCDEFGH")]
-    [FileLineTest("2022/day11/input1.in", "FGCUZREC")]
-    public void Star2(LineEnumerable lines, string _)
+    [FileLineTest("2022/day11/example1.in", 2713310158)]
+    [FileLineTest("2022/day11/input1.in", 13937702909)]
+    public void Star2(LineEnumerable lines, long expected)
     {
+        var monkeys = lines.ReadAll()
+            .Split("Monkey", StringSplitOptions.RemoveEmptyEntries)
+            .Select(it => it.Split("\n"))
+            .Select(Monkey.FromLines)
+            .ToArray();
+
+        var baseDivisors = monkeys.Select(it => it.TestDivisible).Distinct();
+        var greatestCommonDivisor = baseDivisors.Aggregate(1L, (prev, curr) => prev * curr);
+
+        for (int i = 0; i < 10_000; i++)
+        {
+            // monkey round
+            foreach (var (monkey, idx) in monkeys.Select((it, idx) => (it, idx)))
+            {
+                monkeys[idx].InspectCount += monkey.Items.Count;
+                foreach (var action in monkey.PerformTurn( it => it % greatestCommonDivisor))
+                {
+                    monkeys[action.target].Items.Add(action.level);
+                }
+            }
+        }
+
+        var counts = monkeys.Select(it => it.InspectCount).OrderByDescending(it => it).Take(2).ToArray();
+
+        Assert.Equal(expected, counts[0] * counts[1]);
     }
 
     [Fact]
@@ -64,12 +89,12 @@ public class Day11
     }
 
     public record struct Monkey(
-        List<int> Items,
-        Func<int, int> Operation,
-        int TestDivisible,
+        List<long> Items,
+        Func<long, long> Operation,
+        long TestDivisible,
         int Target1,
         int Target2,
-        int InspectCount = 0
+        long InspectCount = 0
     )
     {
         public static Monkey FromLines(IList<string> lines) =>
@@ -81,14 +106,14 @@ public class Day11
                 Target2: lines[5].ExtractInt(@".*monkey (\d+)")!.Value
             );
 
-        public static List<int> ParseItems(string line) =>
+        public static List<long> ParseItems(string line) =>
             line.ExtractString(@".*items: (.*)")
                 .Split(",", StringSplitOptions.TrimEntries)
-                .Select(int.Parse)
-                .Select( it => (int) it )
+                .Select(long.Parse)
+                // .Select( it => (long) it )
                 .ToList();
 
-        public static Func<int, int> ParseOperation(string line)
+        public static Func<long, long> ParseOperation(string line)
         {
             var (_, op, value, _) = line.Parse(@".*Operation: new = (\w+) (.) (\w+)");
             int? right = int.TryParse(value, out int rightInt) ? (int)rightInt : null;
@@ -100,12 +125,12 @@ public class Day11
             };
         }
 
-        public IEnumerable<(int target, int level)> PerformTurn()
+        public IEnumerable<(int target, long level)> PerformTurn(Func<long, long> simplifier)
         {
             foreach (var item in Items)
             {
                 var itemLevel = Operation(item);
-                var warningLevel = itemLevel / 3;
+                var warningLevel = simplifier.Invoke(itemLevel);
                 var targetMonkey = warningLevel % TestDivisible == 0? Target1 : Target2;
                 yield return (targetMonkey, warningLevel);
             }
