@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using AdventOfCode.utils;
 using Xunit;
 
@@ -25,9 +24,8 @@ public class Day11
             // monkey round
             foreach (var (monkey, idx) in monkeys.Select((it, idx) => (it, idx)))
             {
-                // actionLog.Add($"Turn of Monkey {idx}");
                 monkeys[idx].InspectCount += monkey.Items.Count;
-                foreach (var action in monkey.PerformTurn( level => level))
+                foreach (var action in monkey.PerformTurn())
                 {
                     monkeys[action.target].Items.Add(action.level);
                 }
@@ -58,69 +56,16 @@ public class Day11
 ";
 
         var monkey = Monkey.FromLines(monkeyDefinition.Split("\n"));
-        Assert.Equal(new List<int> {79, 14}, monkey.Items.Select( it => (int)it).ToList());
-        Assert.Equal(19, (int)monkey.Operation.Invoke((NormalizedFactoredNumber)1));
+        Assert.Equal(new List<int> {79, 98}, monkey.Items.Select( it => (int)it).ToList());
+        Assert.Equal(19, monkey.Operation.Invoke(1));
         Assert.Equal(23, monkey.TestDivisible);
         Assert.Equal(2, monkey.Target1);
         Assert.Equal(3, monkey.Target2);
     }
 
-    public record NormalizedFactoredNumber(HashSet<int> Factors)
-    {
-        // first 40 should be enough. If we don't get the correct result this is probably not the cause
-        public static int[] PrimeNumbers = {
-            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
-            73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173
-        };
-        
-        public static NormalizedFactoredNumber operator * (NormalizedFactoredNumber a, NormalizedFactoredNumber b)
-        {
-            var factors = new HashSet<int>(a.Factors.Union(b.Factors));
-            return new NormalizedFactoredNumber(factors);
-        }
-
-        public static NormalizedFactoredNumber operator +(NormalizedFactoredNumber a, NormalizedFactoredNumber b)
-        {
-            int expandedA = (int)a;
-            int expandedB = (int)b;
-            return (NormalizedFactoredNumber)(expandedA + expandedB);
-        }
-
-        // trying out some explicit operators ...
-        public static explicit operator NormalizedFactoredNumber(int number)
-        {
-            var factors = new HashSet<int>();
-            int remainder = number;
-            for (int i = 0; i < PrimeNumbers.Length; i++)
-            {
-                while (remainder % PrimeNumbers[i] == 0)
-                {
-                    remainder /= PrimeNumbers[i];
-                    factors.Add(PrimeNumbers[i]);
-                }
-
-                if (remainder == 1)
-                    break;
-            }
-
-            return new NormalizedFactoredNumber(factors);
-        }
-
-        public static explicit operator int(NormalizedFactoredNumber a)
-        {
-            int result = 1;
-            foreach (int factor in a.Factors)
-            {
-                result *= factor;
-            }
-
-            return result;
-        }
-    }
-
     public record struct Monkey(
-        List<NormalizedFactoredNumber> Items,
-        Func<NormalizedFactoredNumber, NormalizedFactoredNumber> Operation,
+        List<int> Items,
+        Func<int, int> Operation,
         int TestDivisible,
         int Target1,
         int Target2,
@@ -136,17 +81,17 @@ public class Day11
                 Target2: lines[5].ExtractInt(@".*monkey (\d+)")!.Value
             );
 
-        public static List<NormalizedFactoredNumber> ParseItems(string line) =>
+        public static List<int> ParseItems(string line) =>
             line.ExtractString(@".*items: (.*)")
                 .Split(",", StringSplitOptions.TrimEntries)
                 .Select(int.Parse)
-                .Select( it => (NormalizedFactoredNumber) it )
+                .Select( it => (int) it )
                 .ToList();
 
-        public static Func<NormalizedFactoredNumber, NormalizedFactoredNumber> ParseOperation(string line)
+        public static Func<int, int> ParseOperation(string line)
         {
             var (_, op, value, _) = line.Parse(@".*Operation: new = (\w+) (.) (\w+)");
-            NormalizedFactoredNumber? right = int.TryParse(value, out int rightInt) ? (NormalizedFactoredNumber)rightInt : null;
+            int? right = int.TryParse(value, out int rightInt) ? (int)rightInt : null;
             return op switch
             {
                 "*" => old => old * (right ?? old),
@@ -155,16 +100,14 @@ public class Day11
             };
         }
 
-        public IEnumerable<(int target, NormalizedFactoredNumber level)> PerformTurn(Func<int, int> adjustor)
+        public IEnumerable<(int target, int level)> PerformTurn()
         {
             foreach (var item in Items)
             {
-                // debugLog($"Inspecting item with level {item}");
                 var itemLevel = Operation(item);
-                // debugLog($"Item level is evaluated to {itemLevel}");
-                var targetMonkey = itemLevel.Factors.Contains(TestDivisible) ? Target1 : Target2;
-                // debugLog($"Item {worryLevel} thrown to {targetMonkey}");
-                yield return (targetMonkey, itemLevel);
+                var warningLevel = itemLevel / 3;
+                var targetMonkey = warningLevel % TestDivisible == 0? Target1 : Target2;
+                yield return (targetMonkey, warningLevel);
             }
 
             Items.Clear();
